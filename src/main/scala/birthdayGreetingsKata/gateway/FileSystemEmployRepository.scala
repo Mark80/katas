@@ -10,13 +10,10 @@ import scala.io.Source
 class FileSystemEmployRepository(implicit executionContext: ExecutionContext) extends EmployeeRepository {
 
   private val source = "/Users/mtosini/toy-project/katas/src/test/scala/birthdayGreetingsKata/employ.txt"
+  private val employs = getFileLines.map(employFromLine)
 
   override def findEmployeesBornOn(month: Int, day: Int): Future[List[Employ]] = Future {
-    for {
-      line <- getFileLines
-      employ = employFromLine(line)
-      if employ.dateOfBirth == DayOfTheYear(month, day)
-    } yield employ
+    employs.filter(employ => employ.dateOfBirth == DayOfTheYear(month, day))
   }
 
   private def getFileLines =
