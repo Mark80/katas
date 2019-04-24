@@ -1,14 +1,22 @@
-package cats
+package catstudy
 
 case class Cat(name: String, age: Int, color: String)
 
 trait Printable[A] {
+  self =>
+
 
   def format(a: A): String
 
-  def print[A](a: A): Unit =
-    print(format(a))
+  def print(a: A): Unit =
+    println(format(a))
 
+
+  def contramap[B](func: B => A): Printable[B] =
+    new Printable[B] {
+      def format(value: B): String =
+        self.format(func(value))
+    }
 }
 
 object Printable {

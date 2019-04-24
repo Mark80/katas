@@ -6,7 +6,6 @@ import org.scalatest.{BeforeAndAfterEach, Matchers, WordSpec}
 import org.mockito.Mockito._
 import org.mockito.ArgumentMatchers._
 import org.scalatest.concurrent.ScalaFutures
-import birthdayGreetingsKata.Employ
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
