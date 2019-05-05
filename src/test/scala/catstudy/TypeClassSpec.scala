@@ -1,12 +1,18 @@
 package catstudy
 
+import java.io.{BufferedReader, File, FileReader}
+import java.util.concurrent.{Executors, ScheduledExecutorService, ScheduledFuture, ScheduledThreadPoolExecutor, TimeUnit}
+
 import cats.data.{Reader, Validated}
-import cats.effect.IO
+import cats.effect.{IO, Timer}
 import cats.{Functor, Monad}
 import org.scalatest.{Matchers, WordSpec}
 
 import scala.annotation.tailrec
+import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.{ExecutionContext, Future}
 import scala.language.higherKinds
+import scala.util.{Failure, Success}
 
 class TypeClassSpec extends WordSpec with Matchers {
 
@@ -168,8 +174,6 @@ class TypeClassSpec extends WordSpec with Matchers {
 
       val result: Option[Int] = genericMethod(Option(3), Option(5))
 
-      println(result)
-
     }
 
     "monad error as well" in {
@@ -278,30 +282,176 @@ class TypeClassSpec extends WordSpec with Matchers {
         def even[A](lst: Seq[A]): Trampoline[Boolean] =
           lst match {
             case Nil =>
-              println("even Done")
               Done(true)
             case _ :: xs =>
-              println("even More")
               Suspend(() => odd(xs))
           }
 
         def odd[A](lst: Seq[A]): Trampoline[Boolean] =
           lst match {
             case Nil =>
-              println("odd Done")
               Done(false)
             case _ :: xs =>
-              println("odd More")
               Suspend(() => even(xs))
           }
 
-        println(even((0 to 5).toList))
+      }
+
+      "from IO async" in {
+
+        def convert[A](fa: => Future[A])(implicit ec: ExecutionContext): IO[A] =
+          IO.async { cb =>
+            // This triggers evaluation of the by-name param and of onComplete,
+            // so it's OK to have side effects in this callback
+            fa.onComplete {
+              case Success(a) => cb(Right(a))
+              case Failure(e) => cb(Left(e))
+            }
+          }
+        import scala.concurrent.ExecutionContext.Implicits.global
+
+        val io = convert {
+          Future {
+            println("ecccomi")
+            5
+          }
+        }
+
+        val io2 = convert {
+          Future {
+            throw new RuntimeException("Errorrrrrrr!!!!!!")
+          }
+        }
+
+        runAsync(io)
+        runAsync(io2)
+
+        def delayedTick(d: FiniteDuration)(implicit sc: ScheduledExecutorService): IO[Unit] =
+          IO.cancelable { cb =>
+            val runnable = new Runnable { def run() = cb(Right(234)) }
+            val f: ScheduledFuture[_] = sc.schedule(runnable, d.length, d.unit)
+
+            // Returning the cancellation token needed to cancel
+            // the scheduling and release resources early
+            IO(f.cancel(false))
+          }
+
+        implicit val exService: ScheduledExecutorService = Executors.newScheduledThreadPool(1)
+
+        runAsync(delayedTick(FiniteDuration(2, TimeUnit.SECONDS)))
+
+        //Thread.sleep(3000)
+
+        val sio = IO.suspend {
+          io
+        }
+
+        import cats.implicits._
+        import cats.effect.ContextShift
+
+        def fib(n: Int, a: Long, b: Long)(implicit cs: ContextShift[IO]): IO[Long] =
+          IO.suspend {
+            if (n == 0) IO.pure(a)
+            else {
+              val next = fib(n - 1, b, a + b)
+              // Every 100 cycles, introduce a logical thread fork
+              if (n % 100 == 0)
+                cs.shift *> next
+              else
+                next
+            }
+          }
 
       }
 
     }
 
+    "cancel io " in {
+
+      import cats.implicits._
+
+      // Needed for `sleep`
+      import scala.concurrent.duration._
+      implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
+
+      // Delayed println
+      val io3: IO[Unit] = IO.sleep(10.seconds) *> IO(println("Hello!"))
+
+      val cancel: IO[Unit] =
+        io3.unsafeRunCancelable(r => println(s"Done: $r"))
+
+      // ... if a race condition happens, we can cancel it,
+      // thus canceling the scheduling of `IO.sleep`
+      cancel.unsafeRunSync()
+
+      def readFirstLine(file: File): IO[String] =
+        IO(new BufferedReader(new FileReader(file))).bracket { in =>
+          // Usage (the try block)
+          IO(in.readLine())
+        } { in =>
+          // Releasing the reader (the finally block)
+          IO(in.close())
+        }
+
+      import cats.implicits._
+      import cats.effect.ContextShift
+
+      def readFile(file: File)(implicit cs: ContextShift[IO]): IO[String] = {
+        // Opens file with an asynchronous boundary before it,
+        // ensuring that processing doesn't block the "current thread"
+        val acquire: IO[BufferedReader] = IO.shift *> IO(new BufferedReader(new FileReader(file)))
+
+        acquire.bracket { in =>
+          // Usage (the try block)
+          IO {
+            // Ugly, low-level Java code warning!
+            val content = new StringBuilder()
+            var line: String = null
+            do {
+              line = in.readLine()
+              if (line != null) content.append(line)
+            } while (line != null)
+            content.toString()
+          }
+        } { in =>
+          // Releasing the reader (the finally block)
+          // This is problematic if the resulting `IO` can get
+          // canceled, because it can lead to data corruption
+          IO(in.close())
+        }
+      }
+
+    }
+
+    "context shift" in {
+
+      import cats.effect.{ContextShift, IO}
+      import scala.concurrent.ExecutionContext.Implicits.global
+
+      implicit val cs: ContextShift[IO] = IO.contextShift(global)
+
+      def loop(n: Int, task: => Unit): IO[Unit] =
+        if (n > 0)
+          IO.shift.flatMap(_ => {
+            println(task)
+            loop(n - 1, task)
+          })
+        else
+          IO.unit
+
+      val io: IO[Unit] = loop(8, { Thread.sleep(500); println(Thread.currentThread().getName) })
+
+      io.unsafeRunSync()
+
+    }
+
   }
+
+  private def runAsync[T](io: IO[T]) =
+    io.unsafeRunAsync {
+      case Right(value) => println(value)
+      case Left(ex)     => println(ex.getMessage)
+    }
 
   type AllErrorsOr[A] = Validated[List[String], A]
 
@@ -378,3 +528,12 @@ sealed trait Trampoline[+A] {
 case class Done[A](result: A) extends Trampoline[A]
 case class Suspend[A](call: () => Trampoline[A]) extends Trampoline[A]
 case class FlatMap[A, B](sub: Trampoline[A], cont: A => Trampoline[B]) extends Trampoline[B]
+
+class IOT[+A](val unsafeInterpret: () => A) { s =>
+  def map[B](f: A => B) = flatMap(f.andThen(IOT.effect(_)))
+  def flatMap[B](f: A => IOT[B]): IOT[B] =
+    IOT.effect(f(s.unsafeInterpret()).unsafeInterpret())
+}
+object IOT {
+  def effect[A](eff: => A) = new IOT(() => eff)
+}

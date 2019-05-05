@@ -4,7 +4,6 @@ import birthdayGreetingsKata.gateway.FileSystemEmployRepository
 import birthdayGreetingsKata.model.DayOfTheYear
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{Matchers, WordSpec}
-import birthdayGreetingsKata.Employ
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
