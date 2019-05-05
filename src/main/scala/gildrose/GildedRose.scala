@@ -77,8 +77,8 @@ class GildedRose() {
   private def updateQualityOfBackStagePass(item: Item): State[Item, Item] =
     for {
       item1 <- increaseQuality(item)
-      item2 <- if (item1.sellIn < 6) increaseQuality(item) else take(item1)
-      item3 <- if (item2.sellIn < 11) increaseQuality(item2) else take(item2)
+      item2 <- if (item1.sellIn < 11) increaseQuality(item1) else take(item1)
+      item3 <- if (item2.sellIn < 6) increaseQuality(item2) else take(item2)
     } yield item3
 
   implicit class ItemDsl(state: State[Item, Item]) {
