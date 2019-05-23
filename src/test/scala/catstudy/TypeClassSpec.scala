@@ -11,6 +11,7 @@ import org.scalatest.{Matchers, WordSpec}
 import scala.annotation.tailrec
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
+import scala.io.Source
 import scala.language.higherKinds
 import scala.util.{Failure, Success}
 
@@ -361,6 +362,33 @@ class TypeClassSpec extends WordSpec with Matchers {
                 next
             }
           }
+
+      }
+
+      "Resource" in {
+
+        import cats.effect._
+        import cats.implicits._
+
+        val file = "/Users/mtosini/toy-project/katas/src/test/scala/catstudy/TypeClassSpec.scala"
+
+        val acquireExt: IO[Source] = IO {
+          scala.io.Source.fromFile(file)
+        }
+
+        def mkResource(s: String): Resource[IO, Source] = {
+          val acquire: IO[Source] =
+            IO(println(s"Acquiring $s")) *> acquireExt
+
+          def release(s: Source) =
+            IO(s.close())
+
+          Resource.make(acquire)(release)
+        }
+
+        mkResource(file).use((source: Source) => IO(throw new RuntimeException)).unsafeRunSync()
+
+        Resource.fromAutoCloseable(acquireExt).use((source: Source) => IO(println(source.mkString))).unsafeRunSync()
 
       }
 

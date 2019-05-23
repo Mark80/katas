@@ -1,6 +1,8 @@
 package catstudy
 
-import cats.effect.IO
+import java.util.concurrent.Executors
+
+import cats.effect.{ContextShift, Fiber, IO}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
