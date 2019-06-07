@@ -3,21 +3,45 @@ package catstudy
 import java.util.concurrent.Executors
 
 import cats.effect.{ContextShift, Fiber, IO}
+import org.http4s.client.Client
+import cats.effect.IO
+import cats.effect.internals.IOContextShift
+import cats.implicits._
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Random, Success}
 
 object IOMain {
+
   def putStrLn(value: String) = IO(println(value))
   val readLn = IO(scala.io.StdIn.readLine)
 
+  val ops = List()
+
   def main(args: Array[String]): Unit = {
 
-    val program: IO[Unit] = for {
-      _ <- putStrLn(value = "What's your name?")
-      n <- readLn
-      _ <- putStrLn(value = s"Hello, $n!")
-    } yield ()
+//    val doSomething: Client[IO] => IO[Unit] = client => {
+//      for {
+//        _ <- IO.unit
+//        // _ <- ops(Random.nextInt(ops.length))(client)
+//        _ = println(s"done ${Random.nextInt}")
+//        _ <- IO.sleep(100 millis)
+//      } yield ()
+//    }.foreverM
+
+    println((for {
+      n <- IO.pure(Random.nextInt(10))
+      _ <- putStrLn(value = s"What's your name?$n")
+      p <- readLn
+      _ <- putStrLn(value = s"Hello, $p!")
+    } yield ()))
+
+    val program: IO[Unit] = (for {
+      n <- IO.pure(Random.nextInt(10))
+      _ <- putStrLn(value = s"What's your name?$n")
+      p <- readLn
+      _ <- putStrLn(value = s"Hello, $p!")
+    } yield ()).foreverM
 
     program.unsafeRunSync()
 

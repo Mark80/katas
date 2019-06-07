@@ -1,12 +1,19 @@
 package bankaccount
 
-import cats.data.{State, StateT}
+import cats.data.{State, StateT, Writer}
 import cats.effect.IO
 import org.scalatest.{Matchers, WordSpec}
+import cats.implicits._
 
 class BankAccountSpec extends WordSpec with Matchers {
 
   import AccountAlgebra._
+
+  type TestPrinter[T] = Writer[String, T]
+
+  implicit val testPrinter = new Printer[TestPrinter] {
+    def print(text: String): TestPrinter[Unit] = Writer.tell(text)
+  }
 
   "As User" should {
 
@@ -56,12 +63,14 @@ class BankAccountSpec extends WordSpec with Matchers {
 
     "create account balance" in {
 
+      import cats.data._
+
       val initialBalance = Transactions(List(Withdraw(50), Deposit(100)))
 
       val newAccountBalance: String = (for {
-        _ <- StateT.liftF(IO(initialBalance))
-        accountBalance <- printStatement[IO]
-      } yield accountBalance).getAccountBalance(initialBalance)
+        _ <- StateT.liftF(Writer("", initialBalance))
+        accountBalance <- printStatement[TestPrinter]
+      } yield accountBalance).run(initialBalance).run._1
 
       newAccountBalance shouldBe "withdraw 50\ndeposit 100\n"
 
@@ -83,4 +92,9 @@ class BankAccountSpec extends WordSpec with Matchers {
 
   }
 
+}
+
+class TestPrinter extends Printer[IO] {
+
+  def print(text: String): IO[Unit] = IO()
 }

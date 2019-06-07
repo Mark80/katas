@@ -1,8 +1,9 @@
 package bankaccount
 
-import cats.Applicative
+import cats.Monad
 import cats.data.{State, StateT}
 import cats.effect.IO
+import cats.implicits._
 
 object AccountAlgebra {
 
@@ -12,8 +13,17 @@ object AccountAlgebra {
   def withdraw(amount: Int): State[Transactions, Unit] =
     State(transactions => (transactions.copy(Withdraw(amount) :: transactions.transactions), Unit))
 
-  def printStatement[F[_]](implicit printer: Applicative[F]): StateT[F, Transactions, String] =
-    StateT(transactions => printer.pure(transactions, AccountBalanceWriter.writeAccountBalance(transactions)))
+  def printStatement[F[_]](implicit monad: Monad[F], printer: Printer[F]): StateT[F, Transactions, Unit] = {
+    import monad._
+
+    StateT(transactions => {
+      for {
+        transactions <- pure(transactions)
+        balance = AccountBalanceWriter.writeAccountBalance(transactions)
+        _ <- printer.print(balance)
+      } yield (transactions, ())
+    })
+  }
 
 }
 

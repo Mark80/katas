@@ -3,9 +3,9 @@ package catstudy
 import java.io.{BufferedReader, File, FileReader}
 import java.util.concurrent.{Executors, ScheduledExecutorService, ScheduledFuture, ScheduledThreadPoolExecutor, TimeUnit}
 
-import cats.data.{Reader, Validated}
+import cats.data.{EitherT, Reader, Validated}
 import cats.effect.{IO, Timer}
-import cats.{Functor, Monad}
+import cats.{Functor, Monad, Traverse}
 import org.scalatest.{Matchers, WordSpec}
 
 import scala.annotation.tailrec
