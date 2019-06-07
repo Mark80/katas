@@ -11,6 +11,12 @@ class BankAccountSpec extends WordSpec with Matchers {
 
   type TestPrinter[T] = Writer[String, T]
 
+  object TestPrinter {
+
+    def apply[T](s: String, t: T): TestPrinter[T] = Writer(s, t)
+
+  }
+
   implicit val testPrinter = new Printer[TestPrinter] {
     def print(text: String): TestPrinter[Unit] = Writer.tell(text)
   }
@@ -68,7 +74,7 @@ class BankAccountSpec extends WordSpec with Matchers {
       val initialBalance = Transactions(List(Withdraw(50), Deposit(100)))
 
       val newAccountBalance: String = (for {
-        _ <- StateT.liftF(Writer("", initialBalance))
+        _ <- StateT.liftF(TestPrinter("", initialBalance))
         accountBalance <- printStatement[TestPrinter]
       } yield accountBalance).run(initialBalance).run._1
 
