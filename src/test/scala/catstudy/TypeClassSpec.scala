@@ -17,7 +17,7 @@ import scala.util.{Failure, Success}
 
 class TypeClassSpec extends WordSpec with Matchers {
 
-  val cat = Cat("name", 3, "blu")
+  val cat = Gatti("name", 3, "blu")
 
   "Printable" should {
     import Printable._
@@ -44,12 +44,12 @@ class TypeClassSpec extends WordSpec with Matchers {
 
       import cats.Show
 
-      implicit val catsShow = new Show[Cat] {
-        def show(cat: Cat): String =
+      implicit val catsShow = new Show[Gatti] {
+        def show(cat: Gatti): String =
           s"${cat.name} is a ${cat.age} old ${cat.color} cat"
 
       }
-      val showCats = Show.apply[Cat]
+      val showCats = Show.apply[Gatti]
 
       showCats.show(cat) shouldBe s"${cat.name} is a ${cat.age} old ${cat.color} cat"
 
@@ -223,14 +223,14 @@ class TypeClassSpec extends WordSpec with Matchers {
 
       "works" in {
 
-        val catName: Reader[Cat, String] = Reader((cat: Cat) => cat.name)
+        val catName: Reader[Gatti, String] = Reader((cat: Gatti) => cat.name)
 
-        val greetKitty: Reader[Cat, String] =
+        val greetKitty: Reader[Gatti, String] =
           catName.map(name => s"Hello ${name}")
 
         greetKitty.run(cat) // res1: cats.Id[String] = Hello Heathcliff
 
-        val helloCat = Reader((s: Cat) => "Hello")
+        val helloCat = Reader((s: Gatti) => "Hello")
 
         val result = for {
           name <- catName
@@ -285,7 +285,7 @@ class TypeClassSpec extends WordSpec with Matchers {
             case Nil =>
               Done(true)
             case _ :: xs =>
-              Suspend(() => odd(xs))
+              More(() => odd(xs))
           }
 
         def odd[A](lst: Seq[A]): Trampoline[Boolean] =
@@ -293,7 +293,7 @@ class TypeClassSpec extends WordSpec with Matchers {
             case Nil =>
               Done(false)
             case _ :: xs =>
-              Suspend(() => even(xs))
+              More(() => even(xs))
           }
 
       }
@@ -528,12 +528,12 @@ final case class Leaf[A](value: A) extends Tree[A]
 sealed trait Trampoline[+A] {
 
   def resume: Either[() => Trampoline[A], A] = this match {
-    case Done(v)    => Right(v)
-    case Suspend(k) => Left(k)
+    case Done(v) => Right(v)
+    case More(k) => Left(k)
     case FlatMap(sub: Trampoline[A], cont: (A => Trampoline[A])) =>
       sub match {
-        case Done(v)    => cont(v).resume
-        case Suspend(k) => Left(() => FlatMap(k(), cont))
+        case Done(v) => cont(v).resume
+        case More(k) => Left(() => FlatMap(k(), cont))
         case FlatMap(sub2, cont2) =>
           (FlatMap(sub2, (x: Any) => FlatMap(cont2(x), cont)): Trampoline[A]).resume
       }
@@ -543,7 +543,7 @@ sealed trait Trampoline[+A] {
   final def run: A =
     this match {
       case Done(v: A) => v
-      case Suspend(t) => t().run // <- tail recursive, yay
+      case More(t)    => t().run // <- tail recursive, yay
     }
 
   @tailrec
@@ -554,7 +554,7 @@ sealed trait Trampoline[+A] {
 
 }
 case class Done[A](result: A) extends Trampoline[A]
-case class Suspend[A](call: () => Trampoline[A]) extends Trampoline[A]
+case class More[A](call: () => Trampoline[A]) extends Trampoline[A]
 case class FlatMap[A, B](sub: Trampoline[A], cont: A => Trampoline[B]) extends Trampoline[B]
 
 class IOT[+A](val unsafeInterpret: () => A) { s =>

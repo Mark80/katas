@@ -20,25 +20,8 @@ object IOMain {
 
   def main(args: Array[String]): Unit = {
 
-//    val doSomething: Client[IO] => IO[Unit] = client => {
-//      for {
-//        _ <- IO.unit
-//        // _ <- ops(Random.nextInt(ops.length))(client)
-//        _ = println(s"done ${Random.nextInt}")
-//        _ <- IO.sleep(100 millis)
-//      } yield ()
-//    }.foreverM
-
-    println((for {
-      n <- IO.pure(Random.nextInt(10))
-      _ <- putStrLn(value = s"What's your name?$n")
-      p <- readLn
-      _ <- putStrLn(value = s"Hello, $p!")
-    } yield ()))
-
     val program: IO[Unit] = (for {
-      n <- IO.pure(Random.nextInt(10))
-      _ <- putStrLn(value = s"What's your name?$n")
+      _ <- IO(println(s"What's your name?${Random.nextInt(10)}"))
       p <- readLn
       _ <- putStrLn(value = s"Hello, $p!")
     } yield ()).foreverM

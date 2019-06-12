@@ -1,16 +1,14 @@
 package catstudy
 
-case class Cat(name: String, age: Int, color: String)
+case class Gatti(name: String, age: Int, color: String)
 
 trait Printable[A] {
   self =>
-
 
   def format(a: A): String
 
   def print(a: A): Unit =
     println(format(a))
-
 
   def contramap[B](func: B => A): Printable[B] =
     new Printable[B] {
@@ -31,8 +29,8 @@ object Printable {
 
 object PrintableInstance {
 
-  implicit val catPrintable = new Printable[Cat] {
-    def format(cat: Cat): String =
+  implicit val catPrintable = new Printable[Gatti] {
+    def format(cat: Gatti): String =
       s"${cat.name} is a ${cat.age} old ${cat.color} cat"
   }
 
