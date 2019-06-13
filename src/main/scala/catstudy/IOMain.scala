@@ -1,11 +1,6 @@
 package catstudy
 
-import java.util.concurrent.Executors
-
-import cats.effect.{ContextShift, Fiber, IO}
-import org.http4s.client.Client
 import cats.effect.IO
-import cats.effect.internals.IOContextShift
 import cats.implicits._
 
 import scala.concurrent.{ExecutionContext, Future}
