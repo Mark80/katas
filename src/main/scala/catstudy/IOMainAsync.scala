@@ -16,23 +16,13 @@ object IOMainAsync {
 
   def main(args: Array[String]): Unit = {
 
-//    val prog: IO[Unit] =
-//      for {
-//        _ <- infiniteIO(1)(csOne)
-//        _ <- infiniteIO(11)(csOne)
-//      } yield ()
-
     val prog: IO[Unit] =
       for {
         a <- infiniteIO(1)(csOne)
-        //_ <- a.join
         b <- infiniteIO(11)(csOne)
-        _ <- b.join
         _ <- infiniteIO(2)(csTwo)
         _ <- infiniteIO(22)(csTwo)
       } yield ()
-
-    println(prog)
 
     prog.unsafeRunSync()
 

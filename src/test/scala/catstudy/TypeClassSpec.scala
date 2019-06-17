@@ -4,7 +4,7 @@ import java.io.{BufferedReader, File, FileReader}
 import java.util.concurrent.{Executors, ScheduledExecutorService, ScheduledFuture, ScheduledThreadPoolExecutor, TimeUnit}
 
 import cats.data.{EitherT, Reader, Validated}
-import cats.effect.{IO, Timer}
+import cats.effect.{CancelToken, ContextShift, IO, Resource, SyncIO, Timer}
 import cats.{Functor, Monad, Traverse}
 import org.scalatest.{Matchers, WordSpec}
 
@@ -13,7 +13,7 @@ import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 import scala.io.Source
 import scala.language.higherKinds
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 class TypeClassSpec extends WordSpec with Matchers {
 
@@ -278,26 +278,6 @@ class TypeClassSpec extends WordSpec with Matchers {
 
       }
 
-      "Trampoline" in {
-
-        def even[A](lst: Seq[A]): Trampoline[Boolean] =
-          lst match {
-            case Nil =>
-              Done(true)
-            case _ :: xs =>
-              More(() => odd(xs))
-          }
-
-        def odd[A](lst: Seq[A]): Trampoline[Boolean] =
-          lst match {
-            case Nil =>
-              Done(false)
-            case _ :: xs =>
-              More(() => even(xs))
-          }
-
-      }
-
       "from IO async" in {
 
         def convert[A](fa: => Future[A])(implicit ec: ExecutionContext): IO[A] =
@@ -309,9 +289,10 @@ class TypeClassSpec extends WordSpec with Matchers {
               case Failure(e) => cb(Left(e))
             }
           }
+
         import scala.concurrent.ExecutionContext.Implicits.global
 
-        val io = convert {
+        val io: IO[Int] = convert {
           Future {
             println("ecccomi")
             5
@@ -324,28 +305,40 @@ class TypeClassSpec extends WordSpec with Matchers {
           }
         }
 
-        runAsync(io)
-        runAsync(io2)
+        //runAsync(io)
+        //runAsync(io2)
 
         def delayedTick(d: FiniteDuration)(implicit sc: ScheduledExecutorService): IO[Unit] =
           IO.cancelable { cb =>
-            val runnable = new Runnable { def run() = cb(Right(234)) }
+            val runnable = new Runnable {
+              def run(): Unit = {
+                println("complete task")
+                println(System.currentTimeMillis())
+                cb(Right(234))
+              }
+            }
             val f: ScheduledFuture[_] = sc.schedule(runnable, d.length, d.unit)
 
             // Returning the cancellation token needed to cancel
             // the scheduling and release resources early
-            IO(f.cancel(false))
+            IO({
+              println("CANCELL!!!!!")
+              f.cancel(false)
+            })
           }
 
         implicit val exService: ScheduledExecutorService = Executors.newScheduledThreadPool(1)
 
-        runAsync(delayedTick(FiniteDuration(2, TimeUnit.SECONDS)))
+        val value: IO[Unit] = delayedTick(FiniteDuration(3, TimeUnit.SECONDS))
+        println(System.currentTimeMillis())
 
-        //Thread.sleep(3000)
+        val cancToken: SyncIO[CancelToken[IO]] = value.runCancelable(cb => IO.unit)
 
-        val sio = IO.suspend {
-          io
-        }
+        Thread.sleep(500)
+
+        val rr: Unit = cancToken.unsafeRunSync().unsafeRunSync()
+
+        Thread.sleep(6000)
 
         import cats.implicits._
         import cats.effect.ContextShift
@@ -473,12 +466,76 @@ class TypeClassSpec extends WordSpec with Matchers {
 
     }
 
+    "launchMissiles" in {
+
+      SyncIO
+
+      import scala.concurrent.ExecutionContext
+      import cats.implicits._
+
+      // Needed for IO.start to do a logical thread fork
+      implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
+
+      val launchMissiles = IO.raiseError(new Exception("boom!"))
+      val runToBunker = IO(throw new Exception("Run failed!"))
+
+      val operation = for {
+        fiber <- launchMissiles.start
+        _ <- runToBunker.handleErrorWith { error: Throwable =>
+          // Retreat failed, cancel launch (maybe we should
+          // have retreated to our bunker before the launch?)
+          println("cancel")
+          fiber.cancel *> IO.raiseError(error)
+        }
+        aftermath <- fiber.join
+      } yield {
+        aftermath
+      }
+
+      operation.unsafeRunAsync(_ => println("finish"))
+
+    }
+
+    "cancel IO" in {
+
+      import scala.concurrent.ExecutionContext
+      import scala.concurrent.duration._
+      import cats.implicits._
+
+      implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
+
+      val computation = IO.sleep(5 seconds) *> IO(println("Hello"))
+
+      val cancelToken = computation.unsafeRunCancelable(r => println(s"cancel $r"))
+
+      cancelToken.unsafeRunSync()
+
+      Thread.sleep(10000)
+
+    }
+
+    "Resource" in {
+
+      SyncIO
+
+      val acquire = IO(Source.fromString("eccomi "))
+
+      val resource: Resource[IO, Source] = Resource.liftF(acquire)
+
+      val result = resource.use(source => IO.pure(source.getLines().mkString))
+
+      println(result.unsafeRunSync())
+
+    }
+
   }
 
   private def runAsync[T](io: IO[T]) =
     io.unsafeRunAsync {
-      case Right(value) => println(value)
-      case Left(ex)     => println(ex.getMessage)
+      case Right(value) =>
+        println(System.currentTimeMillis())
+        println(value)
+      case Left(ex) => println(ex.getMessage)
     }
 
   type AllErrorsOr[A] = Validated[List[String], A]
@@ -524,38 +581,6 @@ final case class Box[A](value: A)
 sealed trait Tree[+A]
 final case class Branch[A](left: Tree[A], right: Tree[A]) extends Tree[A]
 final case class Leaf[A](value: A) extends Tree[A]
-
-sealed trait Trampoline[+A] {
-
-  def resume: Either[() => Trampoline[A], A] = this match {
-    case Done(v) => Right(v)
-    case More(k) => Left(k)
-    case FlatMap(sub: Trampoline[A], cont: (A => Trampoline[A])) =>
-      sub match {
-        case Done(v) => cont(v).resume
-        case More(k) => Left(() => FlatMap(k(), cont))
-        case FlatMap(sub2, cont2) =>
-          (FlatMap(sub2, (x: Any) => FlatMap(cont2(x), cont)): Trampoline[A]).resume
-      }
-  }
-
-  @tailrec
-  final def run: A =
-    this match {
-      case Done(v: A) => v
-      case More(t)    => t().run // <- tail recursive, yay
-    }
-
-  @tailrec
-  final def runT: A = resume match {
-    case Right(value) => value
-    case Left(more)   => more().runT
-  }
-
-}
-case class Done[A](result: A) extends Trampoline[A]
-case class More[A](call: () => Trampoline[A]) extends Trampoline[A]
-case class FlatMap[A, B](sub: Trampoline[A], cont: A => Trampoline[B]) extends Trampoline[B]
 
 class IOT[+A](val unsafeInterpret: () => A) { s =>
   def map[B](f: A => B) = flatMap(f.andThen(IOT.effect(_)))

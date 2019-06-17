@@ -15,14 +15,14 @@ object ADTMain {
         } yield (n, a) :: xs
       }
       .runS(0)
-      .runT
+      .resume
       ._1
       .reverse
 
   def main(args: Array[String]): Unit = {
     println(zipIndex((0 to 5000).toList))
 
-    val program = Bind(Bind(Pure(5), (n: Int) => Pure(n + 1)), (n: Int) => Pure(n * n))
+    val program = Bind(Bind(Delay(() => Pure(5)), (n: Int) => Pure(n + 1)), (n: Int) => Pure(n * n))
 
     Bind(Pure(5), (n: Int) => Bind(Pure(n + 1), (n: Int) => Pure(n * n)))
     Bind(Pure(6), (n: Int) => Pure(n * n))
@@ -34,9 +34,8 @@ object ADTMain {
       squar <- square(adOne)
     } yield squar
 
-    println(result.runT)
-
-    println(program.runT)
+    println(result.resume)
+    println(program.resume)
 
   }
 
@@ -61,22 +60,28 @@ trait Eval[+A] {
   def map[B](f: A => B): Eval[B] =
     this.flatMap(x => Pure(f(x)))
 
-  final def runT: A = this match {
+  def zip[B](eval: Eval[B]): Eval[(A, B)] =
+    (this, eval) match {
+      case (Pure(a), Pure(b)) =>
+        Pure((a, b))
+    }
+
+  final def resume: A = this match {
     case Pure(v)     => v
-    case Map(sub, f) => sub.map(f).runT
-    case Delay(k)    => k().runT
+    case Map(sub, f) => sub.map(f).resume
+    case Delay(k)    => k().resume
     case Bind(sub, f) =>
       sub match {
-        case Pure(v)  => f(v).runT // g(f(d(f(x))))
-        case Delay(k) => k().flatMap(f).runT
+        case Pure(v)  => f(v).resume // g(f(d(f(x))))
+        case Delay(k) => k().flatMap(f).resume
         case Bind(b, g) =>
-          b.flatMap((x: Any) => g(x) flatMap f).runT
+          b.flatMap((x: Any) => g(x) flatMap f).resume
 
       }
-
   }
 
 }
+
 case class Pure[+A](value: A) extends Eval[A]
 case class Delay[A](thunk: () => Eval[A]) extends Eval[A]
 case class Bind[A, +B](eval: Eval[A], f: A => Eval[B]) extends Eval[B]

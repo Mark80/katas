@@ -18,15 +18,14 @@ object MainTrampoline {
 
     val flat2 = FlatMap(Done(5), (n: Int) => FlatMap(Done(n), (n: Int) => Done(n + 1)))
 
-    println(flat1.runT)
+    //println(flat1.runT)
 
-    //println(">>>>>>>>>>>>>>>>>>>>>>>>>")
+    val hello: Trampoline[Unit] = for {
+      _ <- More(() => Done(print("Hello, ")))
+      _ <- More(() => Done(println("World!")))
+    } yield ()
 
-    //println(flat2.runT)
-
-    //println(result.runT)
-    //even(largeList).runT
-    // zipIndex (largeList)
+    (hello zip hello).runT
 
   }
 
@@ -95,32 +94,31 @@ sealed trait Trampoline[+A] {
   def flatMap[B](f: A => Trampoline[B]): Trampoline[B] =
     FlatMap(this, (a: A) => f(a))
 
+  def zip[B](b: Trampoline[B]): Trampoline[(A, B)] = (this.resume, b.resume) match {
+    case (Right(a), Right(b)) => Done((a, b))
+    case (Left(a), Left(b))   => More(() => a() zip b())
+    case (Left(a), Right(b))  => More(() => a() zip Done(b))
+    case (Right(a), Left(b))  => More(() => Done(a) zip b())
+  }
+
   final def resume: Either[() => Trampoline[A], A] = this match {
 
     case Done(v) =>
-      println(Done(v))
       Right(v)
 
     case More(thunk) =>
-      println(More(thunk))
       Left(thunk)
 
     case FlatMap(sub: Trampoline[A], f: (A => Trampoline[A])) =>
       sub match {
 
-        //FlatMap(FlatMap(b, g), f)
         case FlatMap(b, g) =>
-          println("FlatMap FlatMap")
           (FlatMap(b, (x: Any) => FlatMap(g(x), f)): Trampoline[A]).resume
-        //FlatMap(Done(5), x => FlatMap(Done(x +1),f))
 
         case Done(v) =>
-          println("FlatMap Done")
           f(v).resume
-        //FlatMap(Done(5),f)
 
         case More(k) =>
-          println("FlatMap More")
           Left(() => FlatMap(k(), f))
       }
 
