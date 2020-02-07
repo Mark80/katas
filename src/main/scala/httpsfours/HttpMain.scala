@@ -16,7 +16,8 @@ object HttpMain extends IOApp {
 
   implicit val cs: ContextShift[IO] = IO.contextShift(global)
 
-  val httpApp: Kleisli[IO, Request[IO], Response[IO]] = Router("/api" -> routes).orNotFound
+  val httpApp: Kleisli[IO, Request[IO], Response[IO]] =
+    Router("/api" -> routes).orNotFound
 
   def run(args: List[String]): IO[ExitCode] =
     BlazeServerBuilder[IO]

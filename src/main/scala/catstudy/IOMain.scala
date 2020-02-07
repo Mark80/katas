@@ -26,11 +26,10 @@ object IOMain extends IOApp {
     } yield ()).foreverM
 
   def convert[A](fut: => Future[A])(implicit executionContext: ExecutionContext): IO[A] =
-    IO.async { cb =>
+    IO.async { callBack =>
       fut.onComplete {
-        case Success(value)     => cb(Right(value))
-        case Failure(exception) => cb(Left(exception))
-
+        case Success(value)     => callBack(Right(value))
+        case Failure(exception) => callBack(Left(exception))
       }
 
     }
