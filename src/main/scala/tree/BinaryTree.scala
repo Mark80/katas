@@ -7,6 +7,7 @@ object BinaryTree {
   def main(args: Array[String]): Unit = {
     println(cBalanced(3, "x"))
     println(cBalanced(4, "x").size)
+    println(cBalanced(31, "x").size)
 
   }
 
@@ -22,11 +23,11 @@ object Tree {
       cBalanced((n - 1) / 2, t).flatMap((tree: Tree[T]) => List(Node(t, tree, tree)))
 
     case _ if (n - 1) % 2 == 1 =>
-      val r = for {
+      for {
         big <- cBalanced(n / 2, t)
         small <- cBalanced((n - 1) / 2, t)
-      } yield List(Node(t, small, big), Node(t, big, small))
-      r.flatten
+        result <- List(Node(t, small, big), Node(t, big, small))
+      } yield result
 
   }
 
