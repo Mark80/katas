@@ -4,23 +4,25 @@ name := "katas"
 
 version := "0.1"
 
-scalaVersion := "2.12.6"
+scalaVersion := "2.12.10"
 
 scalacOptions += "-Ypartial-unification"
 scalacOptions += "-language:higherKinds"
+
+libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value
+
 
 val http4sVersion = "0.20.1"
 val circeVersion = "0.11.1"
 
 resolvers ++= Seq(
-    Resolver.sonatypeRepo("releases"),
-    Resolver.sonatypeRepo("snapshots")
+  Resolver.sonatypeRepo("releases"),
+  Resolver.sonatypeRepo("snapshots")
 )
 
-val akkaVersion     = "2.5.21"
+val akkaVersion = "2.5.21"
 val akkaHttpVersion = "10.1.7"
-val alpakkaVersion  = "1.0.5"
-
+val alpakkaVersion = "1.0.5"
 
 libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-sql" % "2.4.4",
@@ -37,14 +39,12 @@ libraryDependencies ++= Seq(
   "org.sangria-graphql" %% "sangria-relay" % "1.4.2",
   "org.apache.avro" % "avro" % "1.9.1",
   "org.mockito" % "mockito-core" % "2.10.0" % Test,
-  "com.typesafe.akka"          %% "akka-http"            % akkaHttpVersion,
-  "com.typesafe.akka"          %% "akka-http-spray-json" % akkaHttpVersion,
-  "com.typesafe.akka"          %% "akka-stream"          % akkaVersion,
-  "com.typesafe.scala-logging" %% "scala-logging"        % "3.9.0",
-  "com.typesafe.akka"          %% "akka-stream-kafka"    % alpakkaVersion
+  "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
+  "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpVersion,
+  "com.typesafe.akka" %% "akka-stream" % akkaVersion,
+  "com.typesafe.scala-logging" %% "scala-logging" % "3.9.0",
+  "com.typesafe.akka" %% "akka-stream-kafka" % alpakkaVersion,
+  "io.projectreactor" % "reactor-core" % "3.4.3"
 )
-
-
-
 
 fork in run := true

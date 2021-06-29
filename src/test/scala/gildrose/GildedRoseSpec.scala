@@ -22,7 +22,6 @@ class GildedRoseSpec extends WordSpec with Matchers {
     "decrease SellIn and quality of a standard item" in {
 
       val item = Item("standard", 3, 5)
-
       updateItem(item) shouldBe Item("standard", 2, 4)
 
     }
