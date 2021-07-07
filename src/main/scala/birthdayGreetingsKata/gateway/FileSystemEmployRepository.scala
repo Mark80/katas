@@ -7,12 +7,12 @@ import birthdayGreetingsKata.Employ
 import scala.concurrent.{ExecutionContext, Future}
 import scala.io.Source
 
-class FileSystemEmployRepository(implicit executionContext: ExecutionContext) extends EmployeeRepository {
+class FileSystemEmployRepository extends EmployeeRepository {
 
   private val source = "/Users/mtosini/toy-project/katas/src/test/scala/birthdayGreetingsKata/employ.txt"
   private val employs = getFileLines.map(employFromLine)
 
-  override def findEmployeesBornOn(month: Int, day: Int): Future[List[Employ]] = Future {
+  override def findEmployeesBornOn(implicit executionContext: ExecutionContext) : (Mount, Day) =>  Future[List[Employ]] = (month :Mount, day :Day) => Future {
     employs.filter(employ => employ.dateOfBirth == DayOfTheYear(month, day))
   }
 

@@ -14,7 +14,7 @@ class BirthdayServiceSpec extends WordSpec with Matchers with MockitoSugar with 
 
   val employeeRepository = mock[EmployeeRepository]
   val emailService = mock[EmailService]
-  val service = new BirthdayService(employeeRepository, emailService)
+  val service = new BirthdayService
 
   override def beforeEach(): Unit =
     reset(employeeRepository, emailService)
@@ -27,7 +27,7 @@ class BirthdayServiceSpec extends WordSpec with Matchers with MockitoSugar with 
 
       when(employeeRepository.findEmployeesBornOn(any[Int], any[Int])).thenReturn(Future.successful(Nil))
 
-      service.sendGreetings(today)
+      service.sendGreetings(employeeRepository, emailService)(today)
       verify(employeeRepository).findEmployeesBornOn(11, 23)
       verify(emailService).sendGreetingsTo(Nil)
     }
@@ -45,7 +45,7 @@ class BirthdayServiceSpec extends WordSpec with Matchers with MockitoSugar with 
       when(employeeRepository.findEmployeesBornOn(any[Int], any[Int])).thenReturn(Future.successful(List(employ)))
       when(emailService.sendGreetingsTo(any[List[Greeting]])).thenReturn(Future.unit)
 
-      service.sendGreetings(today).futureValue
+      service.sendGreetings(employeeRepository, emailService)(today).futureValue
       verify(employeeRepository).findEmployeesBornOn(11, 23)
       verify(emailService).sendGreetingsTo(List(greeting))
 

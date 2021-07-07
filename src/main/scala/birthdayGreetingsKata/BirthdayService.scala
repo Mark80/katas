@@ -4,11 +4,11 @@ import birthdayGreetingsKata.model.{DayOfTheYear, Greeting}
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class BirthdayService(employeeRepository: EmployeeRepository, emailService: EmailService)(implicit executionContext: ExecutionContext) {
+class BirthdayService {
 
-  def sendGreetings(today: DayOfTheYear): Future[Unit] =
+  def sendGreetings(employeeRepository: EmployeeRepository, emailService: EmailService )(today: DayOfTheYear)(implicit executionContext: ExecutionContext): Future[Unit] =
     for {
-      employees <- employeeRepository.findEmployeesBornOn(today.month, today.day)
+      employees <- employeeRepository.findEmployeesBornOn
       _ <- emailService.sendGreetingsTo(createGreetingsFrom(employees))
     } yield ()
 
